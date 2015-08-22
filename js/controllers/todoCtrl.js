@@ -6,24 +6,24 @@
  * - retrieves and persists the model via the $firebaseArray service
  * - exposes the model to the template and provides event handlers
  */
-todomvc.controller('TodoCtrl', function TodoCtrl($scope, $location, $firebaseArray) {
+todomvc.controller('TodoCtrl', function TodoCtrl($scope, $location, $firebaseArray, $firebaseObject) {
 	var url = 'https://todo-mvc-firebase-ex.firebaseio.com/todos';
 	var fireRef = new Firebase(url);
 
     //LOAD DATA. This really should be done through a service, but it works.
-    //1. localStorage way
-    if(localStorage.todos){
-        $scope.todos = JSON.parse(localStorage.todos)
-    } else{
-        $scope.todos = [
-            {title: 'An example todo item', completed: false},
-            {title: 'Another example one', completed: true}
-        ]
-    }
-
-    //2. Firebase way
+    //1. Non persistent way
+    $scope.todos = [
+        {title: 'An example todo item', completed: false},
+        {title: 'Another example one', completed: true}
+    ];
+    //2. Firebase manual way
 	//$scope.todos = $firebaseArray(fireRef);
 
+    //3. Firebase automatic way
+    /*
+    var obj = $firebaseObject(fireRef);
+    obj.$bindTo($scope, 'todos');
+    */
 
 	$scope.newTodo = '';
 	$scope.editedTodo = null;
@@ -31,7 +31,7 @@ todomvc.controller('TodoCtrl', function TodoCtrl($scope, $location, $firebaseArr
 	$scope.$watch('todos', function () {
 		var total = 0;
 		var remaining = 0;
-		$scope.todos.forEach(function (todo) {
+		angular.forEach($scope.todos, function (todo) {
 			// Skip invalid entries so they don't break the entire app.
 			if (!todo || !todo.title) {
 				return;
@@ -53,14 +53,13 @@ todomvc.controller('TodoCtrl', function TodoCtrl($scope, $location, $firebaseArr
 		if (!newTodo.length) {
 			return;
 		}
-        //ADD A NEW ITEM TO THE LIST AAAAAND TO SAVE IT PERSISTENTLY
-        //1. localStorage Way
+        //ADD A NEW ITEM TO THE LIST
+        //1. Non persistent way
         $scope.todos.push({
             title: newTodo,
             completed: false
         });
 
-        localStorage.todos = JSON.stringify($scope.todos);
         //2. Firebase way
         /*
         $scope.todos.$add({
@@ -68,6 +67,17 @@ todomvc.controller('TodoCtrl', function TodoCtrl($scope, $location, $firebaseArr
 			completed: false
 		});
 		*/
+        //3. Firebase automatic way
+        /*Slightly different from non persistent way since $scope.todos is an object
+        when we're doing it this way. But we simply change it non persistently and later
+        the library automatically detects the change and then updates Firebase */
+        /*
+        $scope.todos[Date.now()] = {
+            title: newTodo,
+            completed: false
+        };
+        */
+
 		$scope.newTodo = '';
 	};
 
@@ -80,11 +90,15 @@ todomvc.controller('TodoCtrl', function TodoCtrl($scope, $location, $firebaseArr
 		$scope.editedTodo = null;
 		var title = todo.title.trim();
 		if (title) {
-            //SAVE THE NEW TITLE PERSISTENTLY (since we already changed it on the scope)
-            //1. localStorage way
-            localStorage.todos = JSON.stringify($scope.todos);
+            //SAVE THE NEW TITLE
+            //1. Non persistent way
+            /* Do nothing since the the variable "todo" has already been modified and will be noticed by angular's two way binding*/
+
 			//2. Firebase way
 			//$scope.todos.$save(todo);
+
+            //3. Firebase Automatic Way
+            /* Do nothing. The change will be automatically detected and saved */
 
 		} else {
 			$scope.removeTodo(todo);
@@ -97,30 +111,45 @@ todomvc.controller('TodoCtrl', function TodoCtrl($scope, $location, $firebaseArr
 	};
 
 	$scope.removeTodo = function (todo) {
-        //REMOVE THE ITEM FROM THE SCOPE LIST AAAAAND FROM THE PERSISTENT STORE
-        //1. localStorage way
+        //REMOVE THE ITEM
+        //1. Non persistent way
         $scope.todos.splice($scope.todos.indexOf(todo), 1);
-        localStorage.todos = JSON.stringify($scope.todos);
+
         //2. Firebase way
 		//$scope.todos.$remove(todo);
+
+        //3. Firebase Automatic way
+        /* Very similar to non persistent way except its an object, not an array */
+        /*
+        angular.forEach($scope.todos, function(thisTodo, key){
+            if(todo === thisTodo){
+                delete $scope.todos[key];
+            }
+        })
+        */
 	};
 
 	$scope.clearCompletedTodos = function () {
-		$scope.todos.forEach(function (todo) {
-			if (todo.completed) {
+		angular.forEach($scope.todos, function (todo) {
+			if (todo && todo.completed) {
 				$scope.removeTodo(todo);
 			}
 		});
 	};
 
 	$scope.markAll = function (allCompleted) {
-		$scope.todos.forEach(function (todo) {
+		angular.forEach($scope.todos, function (todo) {
+            if(!todo || typeof todo !== 'object') return;
 			todo.completed = allCompleted;
-            //SAVES CHANGED ITEM PERSISTENTLY
-            //1. localStorage way
-            localStorage.todos = JSON.stringify($scope.todos);
+
+            //SAVES CHANGED ITEM
+            //1. Non persistent way
+                /* Do nothing since we've already marked it completed */
             //2. Firebase way
             //$scope.todos.$save(todo);
+            //3. Automatic way
+                /* Also do nothing. Will be detected as changed and then saved */
+
 		});
 	};
 
